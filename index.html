@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منظم الدراسة الذكي</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .stat-box {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5em;
+            color: #2980b9;
+        }
+        /* زر المؤقت */
+        .timer-section {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        #timer-display {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            font-family: monospace;
+        }
+        #study-btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            font-weight: bold;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .btn-stopped {
+            background-color: #34495e; /* رمادي غامق / أسود */
+        }
+        .btn-running {
+            background-color: #27ae60; /* أخضر */
+        }
+        /* الأقسام */
+        .section {
+            margin-bottom: 25px;
+        }
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        .add-btn {
+            background-color: #2980b9;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-size: 1em;
+        }
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+        li {
+            background: #f9f9f9;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            border-right: 4px solid #2980b9;
+            transition: 0.2s;
+        }
+        li.completed {
+            text-decoration: line-through;
+            color: #888;
+            background: #e8f8f5;
+            border-right-color: #27ae60;
+        }
+        .delete-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📚 منظم دراستي</h1>
+
+    <!-- الإحصائيات -->
+    <div class="stats">
+        <div class="stat-box">
+            <div>النقاط 🏆</div>
+            <div class="stat-value" id="points-display">0</div>
+        </div>
+        <div class="stat-box">
+            <div>إجمالي الدراسة ⏱️</div>
+            <div class="stat-value" id="total-time-display">0 د</div>
+        </div>
+    </div>
+
+    <!-- المؤقت -->
+    <div class="timer-section">
+        <div id="timer-display">00:00:00</div>
+        <button id="study-btn" class="btn-stopped" onclick="toggleTimer()">ابدأ الدراسة</button>
+    </div>
+
+    <!-- برنامج اليوم -->
+    <div class="section">
+        <h2>📝 برنامج ومهام اليوم</h2>
+        <input type="text" id="task-input" placeholder="أضف مادة أو درساً لليوم...">
+        <button class="add-btn" onclick="addTask()">إضافة للبرنامج</button>
+        <ul id="task-list"></ul>
+    </div>
+
+    <!-- الأهداف -->
+    <div class="section">
+        <h2>🎯 أهدافي الدراسية</h2>
+        <textarea id="goals-input" rows="3" placeholder="اكتب أهدافك هنا (مثلاً: إنهاء 3 فصول هذا الأسبوع)..." oninput="saveGoals()"></textarea>
+    </div>
+</div>
+
+<script>
+    let isStudying = false;
+    let seconds = 0;
+    let timerInterval;
+    
+    // استرجاع البيانات المحفوظة
+    let points = parseInt(localStorage.getItem('studyPoints')) || 0;
+    let totalSeconds = parseInt(localStorage.getItem('totalStudySeconds')) || 0;
+    let tasks = JSON.parse(localStorage.getItem('studyTasks')) || [];
+    let goals = localStorage.getItem('studyGoals') || '';
+
+    // تحديث الواجهة عند الفتح
+    document.getElementById('points-display').innerText = points;
+    document.getElementById('goals-input').value = goals;
+    updateTotalTimeDisplay();
+    renderTasks();
+
+    // تشغيل وإيقاف المؤقت
+    function toggleTimer() {
+        const btn = document.getElementById('study-btn');
+        
+        if (!isStudying) {
+            // بدء الدراسة
+            isStudying = true;
+            btn.innerText = "جاري الدراسة... (اضغط للإنهاء)";
+            btn.className = "btn-running";
+            
+            timerInterval = setInterval(() => {
+                seconds++;
+                updateTimerDisplay();
+            }, 1000);
+        } else {
+            // إيقاف الدراسة وحساب النقاط
+            isStudying = false;
+            clearInterval(timerInterval);
+            btn.innerText = "ابدأ الدراسة";
+            btn.className = "btn-stopped";
+
+            // إضافة الوقت للإجمالي واحتساب النقاط (10 نقاط لكل دقيقة)
+            totalSeconds += seconds;
+            let earnedPoints = Math.floor(seconds / 60) * 10;
+            // إعطاء نقطة واحدة على الأقل إذا درس أقل من دقيقة للتجربة
+            if (seconds > 5 && earnedPoints === 0) earnedPoints = 5; 
+            
+            points += earnedPoints;
+            
+            // حفظ البيانات
+            localStorage.setItem('totalStudySeconds', totalSeconds);
+            localStorage.setItem('studyPoints', points);
+            
+            // تصفير المؤقت الحالي وتحديث الشاشة
+            seconds = 0;
+            updateTimerDisplay();
+            updateTotalTimeDisplay();
+            document.getElementById('points-display').innerText = points;
+        }
+    }
+
+    function updateTimerDisplay() {
+        let hrs = Math.floor(seconds / 3600);
+        let mins = Math.floor((seconds % 3600) / 60);
+        let secs = seconds % 60;
+        document.getElementById('timer-display').innerText = 
+            `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateTotalTimeDisplay() {
+        let totalMins = Math.floor(totalSeconds / 60);
+        let hrs = Math.floor(totalMins / 60);
+        let mins = totalMins % 60;
+        if (hrs > 0) {
+            document.getElementById('total-time-display').innerText = `${hrs} س ${mins} د`;
+        } else {
+            document.getElementById('total-time-display').innerText = `${mins} د`;
+        }
+    }
+
+    // إدارة المهام
+    function addTask() {
+        const input = document.getElementById('task-input');
+        const text = input.value.trim();
+        if (text === '') return;
+
+        tasks.push({ text: text, completed: false });
+        input.value = '';
+        saveAndRenderTasks();
+    }
+
+    function toggleTask(index) {
+        tasks[index].completed = !tasks[index].completed;
+        if (tasks[index].completed) {
+            points += 50; // 50 نقطة عند إنهاء مهمة
+        } else {
+            points -= 50; // خصم النقاط إذا تراجع
+        }
+        localStorage.setItem('studyPoints', points);
+        document.getElementById('points-display').innerText = points;
+        saveAndRenderTasks();
+    }
+
+    function deleteTask(event, index) {
+        event.stopPropagation(); // منع تفعيل شطب المهمة عند الحذف
+        tasks.splice(index, 1);
+        saveAndRenderTasks();
+    }
+
+    function saveAndRenderTasks() {
+        localStorage.setItem('studyTasks', JSON.stringify(tasks));
+        renderTasks();
+    }
+
+    function renderTasks() {
+        const list = document.getElementById('task-list');
+        list.innerHTML = '';
+        tasks.forEach((task, index) => {
+            const li = document.createElement('li');
+            li.className = task.completed ? 'completed' : '';
+            li.onclick = () => toggleTask(index);
+            li.innerHTML = `
+                <span>${task.completed ? '✅ ' : '⬜ '} ${task.text}</span>
+                <button class="delete-btn" onclick="deleteTask(event, ${index})">حذف</button>
+            `;
+            list.appendChild(li);
+        });
+    }
+
+    // حفظ الأهداف
+    function saveGoals() {
+        const goalsText = document.getElementById('goals-input').value;
+        localStorage.setItem('studyGoals', goalsText);
+    }
+</script>
+
+</body>
+</html>
